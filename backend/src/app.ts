@@ -16,7 +16,12 @@ const app = express();
 const port = process.env.PORT || 4000;
 
 // CORS Setup
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,https://xifangui.github.io').split(',').map(s => s.trim());
+const defaultAllowedOrigins = ['http://localhost:3000', 'https://xifangui.github.io'];
+const envAllowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+const allowedOrigins = Array.from(new Set([...defaultAllowedOrigins, ...envAllowedOrigins]));
 const corsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
     if (!origin || allowedOrigins.includes(origin)) {
