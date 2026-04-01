@@ -8,8 +8,11 @@ import logger from './logger';
 import 'antd/dist/reset.css';
 
 // 本番環境ではバックエンドURLをaxiosのデフォルトbaseURLに設定
-if (import.meta.env.VITE_API_BASE_URL) {
-  axios.defaults.baseURL = import.meta.env.VITE_API_BASE_URL;
+const configuredApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
+if (configuredApiBaseUrl) {
+  axios.defaults.baseURL = configuredApiBaseUrl.startsWith('http')
+    ? configuredApiBaseUrl
+    : `https://${configuredApiBaseUrl.replace(/^\/+/, '')}`;
 }
 
 // Axios グローバルエラーインターセプター
