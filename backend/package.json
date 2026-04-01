@@ -6,6 +6,8 @@
     "build": "tsc",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "start": "node dist/src/server.js",
+    "migrate": "node dist/src/migrate.js",
+    "seed": "node dist/src/seed.js",
     "test": "jest --runInBand --detectOpenHandles"
   },
   "dependencies": {
