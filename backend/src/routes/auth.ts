@@ -28,12 +28,13 @@ router.post('/register', async (req, res) => {
 });
 
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ success: false, message: 'Email and password required' });
-  }
-
   try {
+    const email = req.body?.email;
+    const password = req.body?.password;
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'Email and password required' });
+    }
+
     const result = await pool.query('SELECT id, email, password_hash, name, role FROM users WHERE email = $1', [email]);
     const user = result.rows[0];
     if (!user) {
