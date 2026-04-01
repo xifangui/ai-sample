@@ -9,23 +9,40 @@ router.use(authenticateToken);
 router.post('/', async (req: AuthRequest, res) => {
   if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-  const { shipping_address, payment_method, items } = req.body;
-  if (!shipping_address || !payment_method || !Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ success: false, message: 'Missing order body' });
+  const { shipping_address, payment_method, items } = req.body || {};
+  if (!shipping_address || !payment_method) {
+    return res.status(400).json({ success: false, message: 'Missing shipping address or payment method' });
+  }
+
+  let normalizedItems = Array.isArray(items) ? items : [];
+  if (normalizedItems.length === 0) {
+    const cartRows = (await pool.query(
+      'SELECT product_id, quantity FROM cart_items WHERE user_id = $1 ORDER BY id',
+      [req.user.userId],
+    )).rows;
+    normalizedItems = cartRows;
+  }
+
+  if (normalizedItems.length === 0) {
+    return res.status(400).json({ success: false, message: 'Cart is empty' });
   }
 
   await pool.query('BEGIN');
   try {
+    const orderNumber = `ORD-${Date.now()}`;
     const orderRes = await pool.query(
       'INSERT INTO orders (order_number, user_id, total_amount, payment_method, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, now(), now()) RETURNING id',
-      [`ORD-${Date.now()}`, req.user.userId, 0, payment_method, 'pending'],
+      [orderNumber, req.user.userId, 0, payment_method, 'pending'],
     );
     const orderId = orderRes.rows[0].id;
 
     let totalAmount = 0;
 
-    for (const item of items) {
+    for (const item of normalizedItems) {
       const { product_id, quantity } = item;
+      if (!product_id || !quantity || quantity <= 0) {
+        throw new Error('Invalid order item');
+      }
       const product = (await pool.query('SELECT id, price, stock FROM products WHERE id = $1', [product_id])).rows[0];
       if (!product) {
         throw new Error(`Product ${product_id} not found`);
@@ -55,7 +72,7 @@ router.post('/', async (req: AuthRequest, res) => {
 
     await pool.query('COMMIT');
 
-    return res.status(201).json({ success: true, data: { order_id: orderId, order_number: `ORD-${Date.now()}`, total_amount: totalAmount, status: 'pending' } });
+    return res.status(201).json({ success: true, data: { order_id: orderId, order_number: orderNumber, total_amount: totalAmount, status: 'pending' } });
   } catch (error: any) {
     await pool.query('ROLLBACK');
     return res.status(400).json({ success: false, message: error.message });

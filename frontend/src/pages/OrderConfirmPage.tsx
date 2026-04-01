@@ -43,6 +43,17 @@ const OrderConfirmPage: React.FC = () => {
   const total = subtotal + shippingFee + tax;
 
   const placeOrder = async () => {
+    if (!shipping || !payment) {
+      message.warning('配送先または支払い方法が未設定です');
+      navigate('/shipping');
+      return;
+    }
+    if (cartItems.length === 0) {
+      message.warning('カートが空です。商品を追加してください');
+      navigate('/');
+      return;
+    }
+
     setPlacing(true);
     logger.info('[OrderConfirmPage] 注文確定');
     try {
