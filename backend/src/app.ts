@@ -16,7 +16,7 @@ const app = express();
 const port = process.env.PORT || 4000;
 
 // CORS Setup
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000').split(',');
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,https://xifangui.github.io').split(',').map(s => s.trim());
 const corsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
     if (!origin || allowedOrigins.includes(origin)) {
