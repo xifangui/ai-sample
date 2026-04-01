@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  # Backend
+  backend:
+    build: ./backend
+    ports:
+      - "4000:4000"
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 4000
+      DOMAIN: ai-sample.com
+      ALLOWED_ORIGINS: https://ai-sample.com,https://www.ai-sample.com
+      DATABASE_URL: postgresql://user:password@db:5432/ai_sample_db
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      - db
+    networks:
+      - ai-sample-network
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: https://api.ai-sample.com
+        VITE_DOMAIN: ai-sample.com
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - ai-sample-network
+
+  # Database
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ai_sample_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    networks:
+      - ai-sample-network
+
+volumes:
+  postgres_data:
+
+networks:
+  ai-sample-network:
+    driver: bridge
