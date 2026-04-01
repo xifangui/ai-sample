@@ -15,6 +15,15 @@ if (configuredApiBaseUrl) {
     : `https://${configuredApiBaseUrl.replace(/^\/+/, '')}`;
 }
 
+axios.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 // Axios グローバルエラーインターセプター
 axios.interceptors.response.use(
   (response) => response,
