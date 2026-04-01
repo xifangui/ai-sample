@@ -1,5 +1,5 @@
 import { Layout, Menu, Typography, Button, Space } from 'antd';
-import { Route, Routes, Link, useNavigate, useLocation } from 'react-router-dom';
+import { Route, Routes, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import ProductListPage from './pages/ProductListPage';
 import CartPage from './pages/CartPage';
@@ -68,17 +68,17 @@ function App() {
       </Header>
       <Content style={{ padding: '24px', background: '#fff' }}>
         <Routes>
-          <Route path="/" element={<ProductListPage />} />
-          <Route path="/cart" element={<CartPage />} />
-          <Route path="/orders" element={<OrderHistoryPage />} />
-          <Route path="/profile" element={<ProfileEditPage />} />
-          <Route path="/statistics" element={<StatisticsPage />} />
-          <Route path="/shipping" element={<ShippingPage />} />
-          <Route path="/payment" element={<PaymentPage />} />
-          <Route path="/order-confirm" element={<OrderConfirmPage />} />
+          <Route path="/" element={role ? <ProductListPage /> : <Navigate to="/login" replace />} />
+          <Route path="/cart" element={role ? <CartPage /> : <Navigate to="/login" replace />} />
+          <Route path="/orders" element={role ? <OrderHistoryPage /> : <Navigate to="/login" replace />} />
+          <Route path="/profile" element={role ? <ProfileEditPage /> : <Navigate to="/login" replace />} />
+          <Route path="/statistics" element={role === 'admin' ? <StatisticsPage /> : <Navigate to="/login" replace />} />
+          <Route path="/shipping" element={role ? <ShippingPage /> : <Navigate to="/login" replace />} />
+          <Route path="/payment" element={role ? <PaymentPage /> : <Navigate to="/login" replace />} />
+          <Route path="/order-confirm" element={role ? <OrderConfirmPage /> : <Navigate to="/login" replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          <Route path="/admin" element={<AdminDashboardPage />} />
+          <Route path="/admin" element={role === 'admin' ? <AdminDashboardPage /> : <Navigate to="/login" replace />} />
         </Routes>
       </Content>
       <Footer style={{ textAlign: 'center' }}>AI Sample ようこそ</Footer>

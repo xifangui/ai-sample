@@ -34,7 +34,7 @@ jobs:
     - name: Build
       env:
         VITE_BASE_URL: /ai-sample/
-        VITE_API_BASE_URL: ${{ secrets.RENDER_BACKEND_URL || 'http://localhost:4000' }}
+        VITE_API_BASE_URL: ${{ secrets.RENDER_BACKEND_URL }}
       run: npm run build
     
     - name: Deploy to GitHub Pages
