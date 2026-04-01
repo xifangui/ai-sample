@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { Form, Input, Button, message, Alert } from 'antd';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import logger from '../logger';
 
 export default function LoginPage() {
@@ -68,7 +68,7 @@ export default function LoginPage() {
           </Form.Item>
         </Form>
         <div style={{ textAlign: 'center', marginTop: 16 }}>
-          <a href="/register" style={{ color: '#1890ff' }}>新規登録はこちら</a>
+          <Link to="/register" style={{ color: '#1890ff' }}>新規登録はこちら</Link>
         </div>
       </div>
     </div>
