@@ -106,7 +106,7 @@ export default function AdminDashboardPage() {
   const fetchOrders = async () => {
     try {
       const res = await axios.get('/api/admin/orders/recent');
-      logger.log('[AdminDashboard] 注文取得成功:', res.data.data.length, '件');
+      logger.info('[AdminDashboard] 注文取得成功', `${res.data.data.length}件`);
       setOrders(res.data.data);
     } catch (err) {
       logger.error('[AdminDashboard] 注文取得失敗', err);
@@ -117,7 +117,7 @@ export default function AdminDashboardPage() {
     try {
       const res = await axios.get('/api/admin/stats/monthly-summary');
       setMonthlySummary(res.data.data);
-      logger.info('[AdminDashboard] 月別統計取得成功', res.data.data.length, '件');
+      logger.info('[AdminDashboard] 月別統計取得成功', `${res.data.data.length}件`);
     } catch (err) {
       logger.error('[AdminDashboard] 月別統計取得失敗', err);
     }

@@ -30,7 +30,7 @@ const StatisticsPage: React.FC = () => {
         month: new Date(item.month).toLocaleDateString('ja-JP', { year: '2-digit', month: '2-digit' }),
       }));
       setMonthlySummary(formattedMonthly);
-      logger.info('[StatisticsPage] 月別統計取得成功', formattedMonthly.length, '件');
+      logger.info('[StatisticsPage] 月別統計取得成功', `${formattedMonthly.length}件`);
 
       // カテゴリ別統計取得
       const categoryRes = await axios.get('/api/admin/stats/by-category');

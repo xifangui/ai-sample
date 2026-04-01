@@ -86,7 +86,7 @@ export default function OrderHistoryPage() {
     },
     {
       title: '操作',
-      render: (_, record: any) => (
+      render: (_value: unknown, record: any) => (
         <Button type="link" onClick={() => viewOrder(record.id)}>詳細</Button>
       ),
     },
