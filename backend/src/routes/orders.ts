@@ -105,60 +105,70 @@ router.post('/', async (req: AuthRequest, res) => {
   }
 });
 
+// /statistics は /:id より先に定義しないとマッチしない
+router.get('/statistics', async (req: AuthRequest, res) => {
+  if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
+  try {
+    const period = req.query.period || 'month';
+    const totals = (await pool.query(
+      `SELECT date_trunc($1, created_at) AS period, SUM(total_amount) AS total
+       FROM orders
+       WHERE user_id = $2 AND status IN ('completed', 'pending', 'shipped')
+       GROUP BY period
+       ORDER BY period`,
+      [period, req.user.userId],
+    )).rows;
+    return res.json({ success: true, data: totals });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 router.get('/', async (req: AuthRequest, res) => {
   if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
+  try {
+    let query = 'SELECT o.*, u.name as user_name FROM orders o JOIN users u ON o.user_id = u.id';
+    const params: any[] = [];
 
-  let query = 'SELECT o.*, u.name as user_name FROM orders o JOIN users u ON o.user_id = u.id';
-  const params: any[] = [];
+    if (req.user.role !== 'admin') {
+      query += ' WHERE o.user_id = $1';
+      params.push(req.user.userId);
+    }
 
-  // adminロールの場合は全注文、それ以外は自分の注文のみ
-  if (req.user.role !== 'admin') {
-    query += ' WHERE o.user_id = $1';
-    params.push(req.user.userId);
+    query += ' ORDER BY o.created_at DESC';
+
+    const orders = (await pool.query(query, params)).rows;
+    return res.json({ success: true, data: orders });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
   }
-
-  query += ' ORDER BY o.created_at DESC';
-
-  const orders = (await pool.query(query, params)).rows;
-  return res.json({ success: true, data: orders });
 });
 
 router.get('/:id', async (req: AuthRequest, res) => {
   if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
+  try {
+    const orderId = Number(req.params.id);
+    if (isNaN(orderId)) return res.status(400).json({ success: false, message: 'Invalid order id' });
 
-  const orderId = Number(req.params.id);
-  
-  // adminロールの場合は全注文、それ以外は自分の注文のみ
-  let query = 'SELECT * FROM orders WHERE id = $1';
-  const params: any[] = [orderId];
-  
-  if (req.user.role !== 'admin') {
-    query += ' AND user_id = $2';
-    params.push(req.user.userId);
+    let query = 'SELECT * FROM orders WHERE id = $1';
+    const params: any[] = [orderId];
+
+    if (req.user.role !== 'admin') {
+      query += ' AND user_id = $2';
+      params.push(req.user.userId);
+    }
+
+    const order = (await pool.query(query, params)).rows[0];
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+
+    const items = (await pool.query(
+      'SELECT oi.*, p.name, p.image_url FROM order_items oi JOIN products p ON oi.product_id = p.id WHERE oi.order_id = $1',
+      [orderId],
+    )).rows;
+    return res.json({ success: true, data: { order, items } });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
   }
-
-  const order = (await pool.query(query, params)).rows[0];
-  if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
-
-  const items = (await pool.query('SELECT oi.*, p.name, p.image_url FROM order_items oi JOIN products p ON oi.product_id = p.id WHERE oi.order_id = $1', [orderId])).rows;
-  return res.json({ success: true, data: { order, items } });
-});
-
-router.get('/statistics', async (req: AuthRequest, res) => {
-  if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
-
-  const period = req.query.period || 'month';
-
-  const totals = (await pool.query(
-    `SELECT date_trunc($1, created_at) AS period, SUM(total_amount) AS total
-     FROM orders
-     WHERE user_id = $2 AND status IN ('completed', 'pending', 'shipped')
-     GROUP BY period
-     ORDER BY period`,
-    [period, req.user.userId],
-  )).rows;
-
-  return res.json({ success: true, data: totals });
 });
 
 export default router;

@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { Form, Input, Button, message, Alert } from 'antd';
-import axios from 'axios';
+import apiClient from '../api';
 import { useNavigate, Link } from 'react-router-dom';
 import logger from '../logger';
 
@@ -15,12 +15,11 @@ export default function LoginPage() {
     setError(null);
     logger.info('[LoginPage] ログイン試行', values.email);
     try {
-      const res = await axios.post('/api/auth/login', values);
+      const res = await apiClient.post('/api/auth/login', values);
       const { token, user } = res.data.data;
       localStorage.setItem('token', token);
       localStorage.setItem('role', user.role);
       localStorage.setItem('user', JSON.stringify({ id: user.id, email: user.email, name: user.name }));
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       logger.info('[LoginPage] ログイン成功', `email=${user.email} role=${user.role}`);
       message.success('ログイン成功');
       navigate('/');

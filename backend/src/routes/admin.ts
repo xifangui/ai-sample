@@ -19,25 +19,37 @@ router.use(requireAdmin);
 
 // 統計情報取得
 router.get('/stats/users', async (req, res) => {
-  const result = await pool.query('SELECT COUNT(*) as count FROM users');
-  return res.json({ success: true, data: { count: Number(result.rows[0].count) } });
+  try {
+    const result = await pool.query('SELECT COUNT(*) as count FROM users');
+    return res.json({ success: true, data: { count: Number(result.rows[0].count) } });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 router.get('/stats/products', async (req, res) => {
-  const result = await pool.query('SELECT COUNT(*) as count FROM products');
-  return res.json({ success: true, data: { count: Number(result.rows[0].count) } });
+  try {
+    const result = await pool.query('SELECT COUNT(*) as count FROM products');
+    return res.json({ success: true, data: { count: Number(result.rows[0].count) } });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 router.get('/stats/orders', async (req, res) => {
-  const ordersResult = await pool.query('SELECT COUNT(*) as count FROM orders');
-  const revenueResult = await pool.query('SELECT SUM(total_amount) as revenue FROM orders WHERE status IN (\'completed\', \'shipped\')');
-  return res.json({
-    success: true,
-    data: {
-      count: Number(ordersResult.rows[0].count),
-      revenue: Number(revenueResult.rows[0].revenue || 0)
-    }
-  });
+  try {
+    const ordersResult = await pool.query('SELECT COUNT(*) as count FROM orders');
+    const revenueResult = await pool.query('SELECT SUM(total_amount) as revenue FROM orders WHERE status IN (\'completed\', \'shipped\')');
+    return res.json({
+      success: true,
+      data: {
+        count: Number(ordersResult.rows[0].count),
+        revenue: Number(revenueResult.rows[0].revenue || 0)
+      }
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 // 最近の注文取得（adminは全注文、userは自分の注文のみ）
@@ -47,25 +59,27 @@ router.get('/orders/recent', async (req: AuthRequest, res: any) => {
   if (!userId) {
     return res.status(401).json({ success: false, message: 'User not authenticated' });
   }
+  try {
+    let query = `
+      SELECT o.id, o.order_number, o.total_amount, o.status, o.created_at,
+             u.name as user_name
+      FROM orders o
+      JOIN users u ON o.user_id = u.id
+    `;
+    const params: any[] = [];
 
-  let query = `
-    SELECT o.id, o.order_number, o.total_amount, o.status, o.created_at,
-           u.name as user_name
-    FROM orders o
-    JOIN users u ON o.user_id = u.id
-  `;
-  const params: any[] = [];
+    if (role !== 'admin') {
+      query += `WHERE o.user_id = $1 `;
+      params.push(userId);
+    }
 
-  // adminロールの場合は全注文、それ以外は自分の注文のみ
-  if (role !== 'admin') {
-    query += `WHERE o.user_id = $1`;
-    params.push(userId);
+    query += `ORDER BY o.created_at DESC LIMIT 10`;
+
+    const result = await pool.query(query, params);
+    return res.json({ success: true, data: result.rows });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
   }
-
-  query += `ORDER BY o.created_at DESC LIMIT 10`;
-
-  const result = await pool.query(query, params);
-  return res.json({ success: true, data: result.rows });
 });
 
 // 商品管理
@@ -121,105 +135,117 @@ router.post('/categories', async (req, res) => {
 
 // カテゴリ別売上統計
 router.get('/stats/by-category', async (req, res) => {
-  const result = await pool.query(`
-    SELECT c.id as category_id, c.name as category_name, 
-           COALESCE(SUM(oi.quantity * oi.unit_price), 0)::numeric as total_amount,
-           COALESCE(SUM(oi.quantity), 0)::integer as total_quantity
-    FROM categories c
-    LEFT JOIN products p ON c.id = p.category_id
-    LEFT JOIN order_items oi ON p.id = oi.product_id
-    LEFT JOIN orders o ON oi.order_id = o.id AND o.status IN ('completed', 'shipped', 'pending')
-    GROUP BY c.id, c.name
-    ORDER BY total_amount DESC
-  `);
-  const data = result.rows.map(row => ({
-    category_id: row.category_id,
-    category_name: row.category_name,
-    total_amount: Number(row.total_amount),
-    total_quantity: Number(row.total_quantity)
-  }));
-  return res.json({ success: true, data });
+  try {
+    const result = await pool.query(`
+      SELECT c.id as category_id, c.name as category_name, 
+             COALESCE(SUM(oi.quantity * oi.unit_price), 0)::numeric as total_amount,
+             COALESCE(SUM(oi.quantity), 0)::integer as total_quantity
+      FROM categories c
+      LEFT JOIN products p ON c.id = p.category_id
+      LEFT JOIN order_items oi ON p.id = oi.product_id
+      LEFT JOIN orders o ON oi.order_id = o.id AND o.status IN ('completed', 'shipped', 'pending')
+      GROUP BY c.id, c.name
+      ORDER BY total_amount DESC
+    `);
+    const data = result.rows.map(row => ({
+      category_id: row.category_id,
+      category_name: row.category_name,
+      total_amount: Number(row.total_amount),
+      total_quantity: Number(row.total_quantity)
+    }));
+    return res.json({ success: true, data });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 // 月別売上統計
 router.get('/stats/by-month', async (req, res) => {
-  const result = await pool.query(`
-    SELECT DATE_TRUNC('month', o.created_at) as month,
-           COUNT(*)::integer as order_count,
-           COALESCE(SUM(o.total_amount), 0)::numeric as total_amount
-    FROM orders o
-    WHERE o.status IN ('completed', 'shipped', 'pending')
-    GROUP BY DATE_TRUNC('month', o.created_at)
-    ORDER BY month DESC
-    LIMIT 12
-  `);
-  const data = result.rows.map(row => ({
-    month: row.month,
-    order_count: Number(row.order_count),
-    total_amount: Number(row.total_amount)
-  }));
-  return res.json({ success: true, data });
+  try {
+    const result = await pool.query(`
+      SELECT DATE_TRUNC('month', o.created_at) as month,
+             COUNT(*)::integer as order_count,
+             COALESCE(SUM(o.total_amount), 0)::numeric as total_amount
+      FROM orders o
+      WHERE o.status IN ('completed', 'shipped', 'pending')
+      GROUP BY DATE_TRUNC('month', o.created_at)
+      ORDER BY month DESC
+      LIMIT 12
+    `);
+    const data = result.rows.map(row => ({
+      month: row.month,
+      order_count: Number(row.order_count),
+      total_amount: Number(row.total_amount)
+    }));
+    return res.json({ success: true, data });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 // 月別統計サマリー（テーブル表示用）
 router.get('/stats/monthly-summary', async (req, res) => {
-  const result = await pool.query(`
-    WITH monthly_data AS (
+  try {
+    const result = await pool.query(`
+      WITH monthly_data AS (
+        SELECT 
+          DATE_TRUNC('month', o.created_at) as month,
+          COUNT(*)::integer as order_count,
+          COALESCE(SUM(o.total_amount), 0)::numeric as total_amount
+        FROM orders o
+        WHERE o.status IN ('completed', 'shipped', 'pending')
+        GROUP BY DATE_TRUNC('month', o.created_at)
+      ),
+      user_count_by_month AS (
+        SELECT 
+          DATE_TRUNC('month', u.created_at) as month,
+          COUNT(*)::integer as users_created
+        FROM users u
+        GROUP BY DATE_TRUNC('month', u.created_at)
+      ),
+      product_count_by_month AS (
+        SELECT 
+          DATE_TRUNC('month', p.created_at) as month,
+          COUNT(*)::integer as products_created
+        FROM products p
+        GROUP BY DATE_TRUNC('month', p.created_at)
+      ),
+      all_months AS (
+        SELECT DISTINCT DATE_TRUNC('month', created_at) as month
+        FROM (
+          SELECT created_at FROM users
+          UNION ALL
+          SELECT created_at FROM products
+          UNION ALL
+          SELECT created_at FROM orders
+        ) t
+        WHERE DATE_TRUNC('month', created_at) IS NOT NULL
+        ORDER BY month DESC
+        LIMIT 12
+      )
       SELECT 
-        DATE_TRUNC('month', o.created_at) as month,
-        COUNT(*)::integer as order_count,
-        COALESCE(SUM(o.total_amount), 0)::numeric as total_amount
-      FROM orders o
-      WHERE o.status IN ('completed', 'shipped', 'pending')
-      GROUP BY DATE_TRUNC('month', o.created_at)
-    ),
-    user_count_by_month AS (
-      SELECT 
-        DATE_TRUNC('month', u.created_at) as month,
-        COUNT(*)::integer as users_created
-      FROM users u
-      GROUP BY DATE_TRUNC('month', u.created_at)
-    ),
-    product_count_by_month AS (
-      SELECT 
-        DATE_TRUNC('month', p.created_at) as month,
-        COUNT(*)::integer as products_created
-      FROM products p
-      GROUP BY DATE_TRUNC('month', p.created_at)
-    ),
-    all_months AS (
-      SELECT DISTINCT DATE_TRUNC('month', created_at) as month
-      FROM (
-        SELECT created_at FROM users
-        UNION ALL
-        SELECT created_at FROM products
-        UNION ALL
-        SELECT created_at FROM orders
-      ) t
-      WHERE DATE_TRUNC('month', created_at) IS NOT NULL
-      ORDER BY month DESC
-      LIMIT 12
-    )
-    SELECT 
-      am.month,
-      COALESCE(ucm.users_created, 0)::integer as users_created,
-      COALESCE(pcm.products_created, 0)::integer as products_created,
-      COALESCE(md.order_count, 0)::integer as order_count,
-      COALESCE(md.total_amount, 0)::numeric as total_amount
-    FROM all_months am
-    LEFT JOIN user_count_by_month ucm ON am.month = ucm.month
-    LEFT JOIN product_count_by_month pcm ON am.month = pcm.month
-    LEFT JOIN monthly_data md ON am.month = md.month
-    ORDER BY am.month DESC
-  `);
-  const data = result.rows.map(row => ({
-    month: row.month,
-    users_created: Number(row.users_created),
-    products_created: Number(row.products_created),
-    order_count: Number(row.order_count),
-    total_amount: Number(row.total_amount)
-  }));
-  return res.json({ success: true, data });
+        am.month,
+        COALESCE(ucm.users_created, 0)::integer as users_created,
+        COALESCE(pcm.products_created, 0)::integer as products_created,
+        COALESCE(md.order_count, 0)::integer as order_count,
+        COALESCE(md.total_amount, 0)::numeric as total_amount
+      FROM all_months am
+      LEFT JOIN user_count_by_month ucm ON am.month = ucm.month
+      LEFT JOIN product_count_by_month pcm ON am.month = pcm.month
+      LEFT JOIN monthly_data md ON am.month = md.month
+      ORDER BY am.month DESC
+    `);
+    const data = result.rows.map(row => ({
+      month: row.month,
+      users_created: Number(row.users_created),
+      products_created: Number(row.products_created),
+      order_count: Number(row.order_count),
+      total_amount: Number(row.total_amount)
+    }));
+    return res.json({ success: true, data });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 export default router;
