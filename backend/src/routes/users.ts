@@ -45,6 +45,24 @@ router.post('/addresses', authenticateToken, async (req: AuthRequest, res) => {
     return res.status(400).json({ success: false, message: '必須項目を入力してください' });
   }
 
+  const existing = (await pool.query(
+    `SELECT id, postal_code, prefecture, city, address_line1, address_line2, phone, created_at
+     FROM addresses
+     WHERE user_id = $1
+       AND postal_code = $2
+       AND prefecture = $3
+       AND city = $4
+       AND address_line1 = $5
+       AND COALESCE(address_line2, '') = COALESCE($6, '')
+       AND COALESCE(phone, '') = COALESCE($7, '')
+     LIMIT 1`,
+    [req.user.userId, postal_code, prefecture, city, address_line1, address_line2 || '', phone || '']
+  )).rows[0];
+
+  if (existing) {
+    return res.json({ success: true, data: existing });
+  }
+
   const result = await pool.query(
     'INSERT INTO addresses (user_id, postal_code, prefecture, city, address_line1, address_line2, phone, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, now(), now()) RETURNING id, postal_code, prefecture, city, address_line1, address_line2, phone, created_at',
     [req.user.userId, postal_code, prefecture, city, address_line1, address_line2, phone]

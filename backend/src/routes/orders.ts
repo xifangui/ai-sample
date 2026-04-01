@@ -61,11 +61,37 @@ router.post('/', async (req: AuthRequest, res) => {
     // Save shipping address (or use existing one)
     let addressId = shipping_address.address_id;
     if (!addressId) {
-      const addressRes = await pool.query(
-        'INSERT INTO addresses (user_id, postal_code, prefecture, city, address_line1, address_line2, phone, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,now(),now()) RETURNING id',
-        [req.user.userId, shipping_address.postal_code, shipping_address.prefecture, shipping_address.city, shipping_address.address_line1, shipping_address.address_line2, shipping_address.phone],
-      );
-      addressId = addressRes.rows[0].id;
+      const existingAddress = (await pool.query(
+        `SELECT id
+         FROM addresses
+         WHERE user_id = $1
+           AND postal_code = $2
+           AND prefecture = $3
+           AND city = $4
+           AND address_line1 = $5
+           AND COALESCE(address_line2, '') = COALESCE($6, '')
+           AND COALESCE(phone, '') = COALESCE($7, '')
+         LIMIT 1`,
+        [
+          req.user.userId,
+          shipping_address.postal_code,
+          shipping_address.prefecture,
+          shipping_address.city,
+          shipping_address.address_line1,
+          shipping_address.address_line2 || '',
+          shipping_address.phone || '',
+        ],
+      )).rows[0];
+
+      if (existingAddress?.id) {
+        addressId = existingAddress.id;
+      } else {
+        const addressRes = await pool.query(
+          'INSERT INTO addresses (user_id, postal_code, prefecture, city, address_line1, address_line2, phone, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,now(),now()) RETURNING id',
+          [req.user.userId, shipping_address.postal_code, shipping_address.prefecture, shipping_address.city, shipping_address.address_line1, shipping_address.address_line2, shipping_address.phone],
+        );
+        addressId = addressRes.rows[0].id;
+      }
     }
 
     await pool.query('UPDATE orders SET address_id = $1 WHERE id = $2', [addressId, orderId]);
