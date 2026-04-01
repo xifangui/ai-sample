@@ -33,35 +33,39 @@ router.post('/login', async (req, res) => {
     return res.status(400).json({ success: false, message: 'Email and password required' });
   }
 
-  const result = await pool.query('SELECT id, email, password_hash, name, role FROM users WHERE email = $1', [email]);
-  const user = result.rows[0];
-  if (!user) {
-    return res.status(401).json({ success: false, message: 'Invalid email or password' });
-  }
+  try {
+    const result = await pool.query('SELECT id, email, password_hash, name, role FROM users WHERE email = $1', [email]);
+    const user = result.rows[0];
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    }
 
-  const validPassword = await bcrypt.compare(password, user.password_hash);
-  if (!validPassword) {
-    return res.status(401).json({ success: false, message: 'Invalid email or password' });
-  }
+    const validPassword = await bcrypt.compare(password, user.password_hash);
+    if (!validPassword) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    }
 
-  const token = jwt.sign(
-    { userId: user.id, email: user.email, role: user.role },
-    process.env.JWT_SECRET || 'secret',
-    { expiresIn: '7d' }
-  );
-  
-  return res.json({
-    success: true,
-    data: {
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
+    const token = jwt.sign(
+      { userId: user.id, email: user.email, role: user.role },
+      process.env.JWT_SECRET || 'secret',
+      { expiresIn: '7d' }
+    );
+
+    return res.json({
+      success: true,
+      data: {
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+        },
       },
-    },
-  });
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, message: error.message || 'Login failed' });
+  }
 });
 
 router.post('/logout', (req, res) => {
